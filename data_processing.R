@@ -71,8 +71,11 @@ for (i in 1:nrow(reddit_data)) {
 ticker_mentions_df <- do.call(rbind, ticker_mentions)
 rownames(ticker_mentions_df) <- NULL
 
-cat("Aggregating mentions by date and ticker...\n")
+cat("\nTicker mentions by month:")
+ticker_mentions_df$month <- format(ticker_mentions_df$date, "%Y-%m")
+print(table(ticker_mentions_df$month))
 
+cat("Aggregating mentions by date and ticker...\n")
 ticker_mentions_df$count <- 1
 ticker_counts <- aggregate(
   count ~ date + ticker,
@@ -89,7 +92,7 @@ cat("Total ticker-day observations:", nrow(ticker_counts), "\n")
 cat("Unique tickers found:", length(unique(ticker_counts$ticker)), "\n")
 
 cat("\nTicker mentions over time:\n")
-mentions_by_month <- aggregate(count ~ format(date, "%Y-%m"), 
+mentions_by_month <- aggregate(mentions  ~ format(date, "%Y-%m"), 
                                data = ticker_counts, FUN = sum)
 names(mentions_by_month) <- c("month", "total_mentions")
 print(mentions_by_month)
