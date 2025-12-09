@@ -88,6 +88,13 @@ cat("\nTicker extraction summary:\n")
 cat("Total ticker-day observations:", nrow(ticker_counts), "\n")
 cat("Unique tickers found:", length(unique(ticker_counts$ticker)), "\n")
 
+cat("\nTicker mentions over time:\n")
+mentions_by_month <- aggregate(count ~ format(date, "%Y-%m"), 
+                               data = ticker_counts, FUN = sum)
+names(mentions_by_month) <- c("month", "total_mentions")
+print(mentions_by_month)
+
+
 cat("\nMerging Reddit mentions with stock returns...\n")
 
 # Merge on date and ticker

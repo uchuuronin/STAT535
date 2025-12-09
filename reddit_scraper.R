@@ -13,7 +13,7 @@ subreddits <- c("wallstreetbets", "stocks","investing","trading","stockmarket")
 
 # Number of pages to fetch per subreddit (100 posts per page)
 # More pages = more historical data
-n_pages <- 5  # 5 pages = ~500 posts = ~1.5-2 months of data
+n_pages <- 25
 
 # Output file path
 output_file <- "data/raw_reddit.rds"
@@ -91,7 +91,7 @@ all_posts <- list()
 for (sub in subreddits) {
   cat("Scraping r/", sub, "...\n", sep = "")
   
-  # Step 1: Scrape with error handling
+  # Scrape with error handling
   df <- tryCatch({
     scrape_subreddit(sub, n_pages)
   }, error = function(e) {
@@ -99,12 +99,12 @@ for (sub in subreddits) {
     return(NULL)
   })
   
-  # Step 2: Store result if successful
+  # Store result if successful
   if (!is.null(df)) {
     all_posts[[sub]] <- df
   }
   
-  # Step 3: Delay between subreddits to avoid rate limits
+  # Delay between subreddits to avoid rate limits
   Sys.sleep(5)
 }
 
