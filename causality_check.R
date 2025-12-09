@@ -253,17 +253,13 @@ for (i in 1:nrow(results_mentions_to_returns)) {
   cat(cat_name, ":\n")
   
   if (mentions_causes && returns_causes) {
-    cat("  ✓ BIDIRECTIONAL: Feedback loop detected\n")
-    cat("    Reddit discussion and price movements reinforce each other\n")
+    cat("BIDIRECTIONAL: Feedback loop detected\n Reddit discussion and price movements reinforce each other\n")
   } else if (mentions_causes) {
-    cat("  ✓ PREDICTIVE: Mentions predict returns\n")
-    cat("    Reddit discussion has leading indicator value\n")
+    cat("PREDICTIVE: Mentions predict returns\nReddit discussion has leading indicator value\n")
   } else if (returns_causes) {
-    cat("  ✓ REACTIVE: Returns predict mentions\n")
-    cat("    Price movements drive Reddit discussion\n")
+    cat("REACTIVE: Returns predict mentions\nPrice movements drive Reddit discussion\n")
   } else {
-    cat("  ✗ No causal relationship detected\n")
-    cat("    Correlation exists but not predictive\n")
+    cat("No causal relationship detected\nCorrelation exists but not predictive\n")
   }
   cat("\n")
 }

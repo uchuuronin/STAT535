@@ -105,7 +105,7 @@ for (sub in subreddits) {
   }
   
   # Delay between subreddits to avoid rate limits
-  Sys.sleep(5)
+  Sys.sleep(10)
 }
 
 # Combine all posts into single data frame
