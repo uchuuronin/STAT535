@@ -79,11 +79,14 @@ for (cat_name in categories) {
     y_vals <- subset_data$returns * 100
     x_vals <- subset_data$mentions
     
-    y_min <- quantile(y_vals, 0.05)
-    y_max <- quantile(y_vals, 0.95)
-    y_range <- y_max - y_min
-    y_min <- y_min - 0.1 * y_range
-    y_max <- y_max + 0.1 * y_range
+    # y_min <- quantile(y_vals, 0.05)
+    # y_max <- quantile(y_vals, 0.95)
+    # y_range <- y_max - y_min
+    # y_min <- y_min - 0.1 * y_range
+    # y_max <- y_max + 0.1 * y_range
+
+    y_min <- -6
+    y_max <- 6
     
     plot(jitter(x_vals, amount = 0.1), 
          jitter(y_vals, amount = 0.1),

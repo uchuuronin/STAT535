@@ -1,26 +1,27 @@
 # granger_causality.R
-# Granger causality: Do past mentions improve prediction of current returns?
+# Granger causality: Do past mentions improve prediction of current volatility (magnitude)?
 
 merged_data <- readRDS("data/combined_data.rds")
 data <- merged_data[!is.na(merged_data$returns), ]
 
-mega_cap <- c("AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "NFLX", "ORCL", "GOOG")
+big_tech <- c("AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "NFLX", "ORCL", "GOOG")
 retail_meme <- c("PLTR", "HOOD", "SOFI", "GME", "RIVN", "RBLX", "COIN")
 semiconductor <- c("NVDA", "AMD", "AVGO", "INTC", "MU","TSM", "QCOM", "ARM")
 
 data$category <- NA
-data$category[data$ticker %in% mega_cap] <- "Mega-cap"
+data$category[data$ticker %in% big_tech] <- "Big Tech"
 data$category[data$ticker %in% retail_meme] <- "Retail/Meme"
 data$category[data$ticker %in% semiconductor] <- "Semiconductor"
 
-cat("GRANGER CAUSALITY TEST\n\n")
-# Question 1: Do past Reddit mentions predict current stock returns?
-# Question 2: Do past stock returns predict current Reddit mentions?
+# Create volatility variable (absolute returns)
+data$volatility <- abs(data$returns) * 100  # As percentage
 
 #' Granger causality test using F-test
-#' @param data Data frame with date, ticker, mentions, returns
+#' @param data Data frame with date, ticker, mentions, volatility
+#' @param x_var Predictor variable
+#' @param y_var Response variable
 #' @param max_lag Maximum number of lags to test (default 3)
-#' @return Data frame with F-statistics and p-values
+#' @return List with F-statistics and p-values
 granger_test <- function(data, x_var, y_var, max_lag = 3) {
   # Sort by ticker and date
   data <- data[order(data$ticker, data$date), ]
@@ -72,9 +73,9 @@ granger_test <- function(data, x_var, y_var, max_lag = 3) {
   ))
 }
 
-categories <- c("Mega-cap", "Retail/Meme", "Semiconductor")
+categories <- c("Big Tech", "Retail/Meme", "Semiconductor")
 
-results_mentions_to_returns <- data.frame(
+results_mentions_to_volatility <- data.frame(
   Category = character(),
   N = integer(),
   F_Stat = numeric(),
@@ -86,21 +87,19 @@ results_mentions_to_returns <- data.frame(
   stringsAsFactors = FALSE
 )
 
-results_returns_to_mentions <- data.frame(
+results_volatility_to_mentions <- data.frame(
   Category = character(),
   N = integer(),
   F_Stat = numeric(),
   P_Value = numeric(),
-  R2_Without_Returns = numeric(),
-  R2_With_Returns = numeric(),
+  R2_Without_Volatility = numeric(),
+  R2_With_Volatility = numeric(),
   Improvement = numeric(),
   Granger_Causes = character(),
   stringsAsFactors = FALSE
 )
 
-cat("DIRECTION 1: Mentions result in Returns\n")
-cat("(Do past mentions help predict current returns?)\n\n")
-
+cat("(Do past mentions help predict current volatility?)\n")
 for (cat_name in categories) {
   subset_data <- data[data$category == cat_name & !is.na(data$category), ]
   
@@ -109,8 +108,8 @@ for (cat_name in categories) {
     next
   }
   
-  # Test: mentions result in returns
-  result <- granger_test(subset_data, x_var = "mentions", y_var = "returns", max_lag = 3)
+  # Test: mentions help predict volatility
+  result <- granger_test(subset_data, x_var = "mentions", y_var = "volatility", max_lag = 3)
   
   if (!is.na(result$f_stat)) {
     improvement <- (result$unrestricted_r2 - result$restricted_r2) / result$restricted_r2 * 100
@@ -121,12 +120,12 @@ for (cat_name in categories) {
     cat("  F-statistic:", round(result$f_stat, 3), "\n")
     cat("  P-value:", round(result$p_value, 4), 
         ifelse(result$p_value < 0.05, " *SIGNIFICANT*", ""), "\n")
-    cat("  R² without mentions:", round(result$restricted_r2, 4), "\n")
-    cat("  R² with mentions:", round(result$unrestricted_r2, 4), "\n")
+    cat("  R^2 without mentions:", round(result$restricted_r2, 4), "\n")
+    cat("  R^2 with mentions:", round(result$unrestricted_r2, 4), "\n")
     cat("  Improvement:", round(improvement, 2), "%\n")
-    cat("  result in Mentions Granger-cause returns?", causes, "\n\n")
+    cat("  Mentions Granger-cause volatility?", causes, "\n\n")
     
-    results_mentions_to_returns <- rbind(results_mentions_to_returns, data.frame(
+    results_mentions_to_volatility <- rbind(results_mentions_to_volatility, data.frame(
       Category = cat_name,
       N = result$n,
       F_Stat = result$f_stat,
@@ -140,8 +139,7 @@ for (cat_name in categories) {
 }
 
 cat("\n")
-cat("DIRECTION 2: Returns result in Mentions\n")
-cat("(Do past returns help predict current mentions?)\n\n")
+cat("(Do past volatility levels help predict current mentions?)\n")
 
 for (cat_name in categories) {
   subset_data <- data[data$category == cat_name & !is.na(data$category), ]
@@ -151,8 +149,8 @@ for (cat_name in categories) {
     next
   }
   
-  # Test: returns result in mentions
-  result <- granger_test(subset_data, x_var = "returns", y_var = "mentions", max_lag = 3)
+  # Test: volatility helps predict mentions
+  result <- granger_test(subset_data, x_var = "volatility", y_var = "mentions", max_lag = 3)
   
   if (!is.na(result$f_stat)) {
     improvement <- (result$unrestricted_r2 - result$restricted_r2) / result$restricted_r2 * 100
@@ -163,58 +161,63 @@ for (cat_name in categories) {
     cat("  F-statistic:", round(result$f_stat, 3), "\n")
     cat("  P-value:", round(result$p_value, 4), 
         ifelse(result$p_value < 0.05, " *SIGNIFICANT*", ""), "\n")
-    cat("  R² without returns:", round(result$restricted_r2, 4), "\n")
-    cat("  R² with returns:", round(result$unrestricted_r2, 4), "\n")
+    cat("  R^2 without volatility:", round(result$restricted_r2, 4), "\n")
+    cat("  R^2 with volatility:", round(result$unrestricted_r2, 4), "\n")
     cat("  Improvement:", round(improvement, 2), "%\n")
-    cat("  result in Returns Granger-cause mentions?", causes, "\n\n")
+    cat("  Volatility Granger-causes mentions?", causes, "\n\n")
     
-    results_returns_to_mentions <- rbind(results_returns_to_mentions, data.frame(
+    results_volatility_to_mentions <- rbind(results_volatility_to_mentions, data.frame(
       Category = cat_name,
       N = result$n,
       F_Stat = result$f_stat,
       P_Value = result$p_value,
-      R2_Without_Returns = result$restricted_r2,
-      R2_With_Returns = result$unrestricted_r2,
+      R2_Without_Volatility = result$restricted_r2,
+      R2_With_Volatility = result$unrestricted_r2,
       Improvement = improvement,
       Granger_Causes = causes
     ))
   }
 }
 
-cat("\nSummary of Causality Analysis:\n\n")
+cat("\n")
+cat("SUMMARY OF CAUSALITY ANALYSIS (VOLATILITY)\n")
 
-cat("MENTIONS result in RETURNS:\n")
-print(results_mentions_to_returns)
+cat("MENTIONS help predict VOLATILITY:\n")
+print(results_mentions_to_volatility)
 cat("\n")
 
-cat("RETURNS result in MENTIONS:\n")
-print(results_returns_to_mentions)
+cat("VOLATILITY help predict MENTIONS:\n")
+print(results_volatility_to_mentions)
 cat("\n")
 
 # Save results
-write.csv(results_mentions_to_returns, "plots/granger_mentions_to_returns.csv", row.names = FALSE)
-write.csv(results_returns_to_mentions, "plots/granger_returns_to_mentions.csv", row.names = FALSE)
+write.csv(results_mentions_to_volatility, "plots/granger_mentions_to_volatility.csv", row.names = FALSE)
+write.csv(results_volatility_to_mentions, "plots/granger_volatility_to_mentions.csv", row.names = FALSE)
 
-cat("\nINTERPRETATION:\n")
-cat("- If 'Mentions result in Returns' is significant: Reddit discussion predicts future price moves\n")
-cat("- If 'Returns result in Mentions' is significant: Price moves drive Reddit discussion\n")
+cat("Results saved to:\n")
+cat("  - plots/granger_mentions_to_volatility.csv\n")
+cat("  - plots/granger_volatility_to_mentions.csv\n\n")
+
+cat("INTERPRETATION\n")
+cat("- If 'Mentions result in Volatility' is significant: Reddit discussion predicts larger price swings\n")
+cat("- If 'Volatility results in Mentions' is significant: Large price moves drive Reddit discussion\n")
 cat("- If BOTH significant: Bidirectional feedback loop exists\n")
 cat("- If NEITHER significant: No causal relationship detected\n\n")
 
 # Visualization
 if (!dir.exists("plots")) dir.create("plots")
 
-png("plots/granger_causality_results.png", width = 1000, height = 600)
+png("plots/granger_causality_volatility_results.png", width = 1000, height = 600)
 par(mfrow = c(1, 2), mar = c(5, 5, 4, 2))
 
-# Plot 1: Mentions result in Returns
-if (nrow(results_mentions_to_returns) > 0) {
-  barplot(results_mentions_to_returns$F_Stat,
-          names.arg = results_mentions_to_returns$Category,
-          col = ifelse(results_mentions_to_returns$P_Value < 0.05, "darkgreen", "gray"),
-          main = "Mentions result in Returns\n(Do mentions predict returns?)",
+# Plot 1: Mentions to Volatility
+if (nrow(results_mentions_to_volatility) > 0) {
+  barplot(results_mentions_to_volatility$F_Stat,
+          names.arg = results_mentions_to_volatility$Category,
+          col = ifelse(results_mentions_to_volatility$P_Value < 0.05, "darkgreen", "gray"),
+          main = "Mentions - Volatility\n(Do mentions predict price swing size?)",
           ylab = "F-Statistic",
-          ylim = c(0, max(results_mentions_to_returns$F_Stat) * 1.2))
+          ylim = c(0, max(results_mentions_to_volatility$F_Stat, na.rm = TRUE) * 1.2))
   
   # Add significance threshold line
   f_crit <- qf(0.95, 3, 20)  # Approximate critical value
@@ -222,44 +225,54 @@ if (nrow(results_mentions_to_returns) > 0) {
   text(0.5, f_crit * 1.1, "p=0.05 threshold", col = "red", pos = 4)
 }
 
-# Plot 2: Returns result in Mentions
-if (nrow(results_returns_to_mentions) > 0) {
-  barplot(results_returns_to_mentions$F_Stat,
-          names.arg = results_returns_to_mentions$Category,
-          col = ifelse(results_returns_to_mentions$P_Value < 0.05, "darkblue", "gray"),
-          main = "Returns result in Mentions\n(Do returns predict mentions?)",
+# Plot 2: Volatility to Mentions
+if (nrow(results_volatility_to_mentions) > 0) {
+  barplot(results_volatility_to_mentions$F_Stat,
+          names.arg = results_volatility_to_mentions$Category,
+          col = ifelse(results_volatility_to_mentions$P_Value < 0.05, "darkblue", "gray"),
+          main = "Volatility - Mentions\n(Do price swings predict discussion?)",
           ylab = "F-Statistic",
-          ylim = c(0, max(results_returns_to_mentions$F_Stat) * 1.2))
+          ylim = c(0, max(results_volatility_to_mentions$F_Stat, na.rm = TRUE) * 1.2))
   
   abline(h = f_crit, col = "red", lty = 2, lwd = 2)
   text(0.5, f_crit * 1.1, "p=0.05 threshold", col = "red", pos = 4)
 }
 
 dev.off()
-cat("Saved: plots/granger_causality_results.png\n")
+cat("Plot saved: plots/granger_causality_volatility_results.png\n\n")
 
+# Detailed interpretation for each category
+cat("DETAILED CAUSALITY PATTERNS\n")
 
-for (i in 1:nrow(results_mentions_to_returns)) {
-  cat_name <- results_mentions_to_returns$Category[i]
+for (i in 1:nrow(results_mentions_to_volatility)) {
+  cat_name <- results_mentions_to_volatility$Category[i]
   
-  mentions_causes <- results_mentions_to_returns$Granger_Causes[i] == "YES*"
-  returns_causes <- FALSE
+  mentions_causes_volatility <- results_mentions_to_volatility$Granger_Causes[i] == "YES*"
+  volatility_causes_mentions <- FALSE
   
-  if (cat_name %in% results_returns_to_mentions$Category) {
-    returns_causes <- results_returns_to_mentions$Granger_Causes[
-      results_returns_to_mentions$Category == cat_name] == "YES*"
+  if (cat_name %in% results_volatility_to_mentions$Category) {
+    volatility_causes_mentions <- results_volatility_to_mentions$Granger_Causes[
+      results_volatility_to_mentions$Category == cat_name] == "YES*"
   }
   
   cat(cat_name, ":\n")
   
-  if (mentions_causes && returns_causes) {
-    cat("BIDIRECTIONAL: Feedback loop detected\n Reddit discussion and price movements reinforce each other\n")
-  } else if (mentions_causes) {
-    cat("PREDICTIVE: Mentions predict returns\nReddit discussion has leading indicator value\n")
-  } else if (returns_causes) {
-    cat("REACTIVE: Returns predict mentions\nPrice movements drive Reddit discussion\n")
+  if (mentions_causes_volatility && volatility_causes_mentions) {
+    cat("  BIDIRECTIONAL: Feedback loop detected\n")
+    cat("  - Reddit discussion and volatility reinforce each other\n")
+    cat("  - High mentions lead to bigger swings, which generate more discussion\n")
+  } else if (mentions_causes_volatility) {
+    cat("  PREDICTIVE: Mentions predict volatility\n")
+    cat("  - High Reddit discussion precedes larger price movements\n")
+    cat("  - Social media attention increases market volatility\n")
+  } else if (volatility_causes_mentions) {
+    cat("  REACTIVE: Volatility predicts mentions\n")
+    cat("  - Large price swings drive Reddit discussion\n")
+    cat("  - Traders discuss stocks after dramatic moves\n")
   } else {
-    cat("No causal relationship detected\nCorrelation exists but not predictive\n")
+    cat("  NO CAUSAL RELATIONSHIP: Correlation exists but not predictive\n")
+    cat("  - Same-day correlation does not imply temporal causation\n")
+    cat("  - Both may respond to common external factors\n")
   }
   cat("\n")
 }
